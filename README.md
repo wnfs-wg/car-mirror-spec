@@ -24,33 +24,33 @@ CAR Mirror describes a method for efficiently diffing, deduplicating, packaging,
  
 # 1 Introduction
 
-[IPLD] is structured as a Merkle DAG, which closes authentication over some rooted structure, but gives no help in determining what might be contained in it without actually walking this tree. The naive approach for deduplicated synchronization on deep DAGs requires a large number of round trips as children are discovered at each level. Not packaging up the entire structure into one request is motivated by deduplication: the recipient may already have many of the blocks, and transferring them would be redundant. This situation creates an apparent zero sum optimization problem between deduplication and round trips.
+[IPLD] is structured as a Merkle DAG, which closes authentication over some rooted structure, but gives no help in determining what might be contained in it without actually walking the nodes. The naive approach for deduplicated synchronization on deep DAGs requires a large number of round trips as children are discovered at each level. Not packaging up the entire structure into one request is motivated by deduplication: the recipient may already have many of the blocks, and transferring them would be redundant. This situation creates an apparent zero sum optimization problem between deduplication and round trips.
 
 ## 1.1 Motivation
 
-This proposal resolves multiple major, persistent challenges that numerous production IPFS operators have experienced. We believe the scope of this work to be an important stepping stone in the maturation of [IPFS], [Filecoin], and other [IPLD] data in production settings.
+This proposal resolves multiple major, persistent challenges that numerous production [IPFS] operators have experienced. We believe the scope of this work to be an important stepping stone in the maturation of [IPFS], [Filecoin], and other [IPLD] data in production settings.
 
-We propose extending the existing efforts to move specifically CAR files over HTTP (e.g. Filecoin point-to-point CAR, Qri’s DSync), and enable other transports such as [WSS], [HTTP/2 Streaming], and [WebRTC]. We know of several other projects in the broader ecosystem that would like to make use of this protocol, from storage providers and CDNs to decentralized social media protocols.
+We propose extending the existing efforts to move specifically CAR files over HTTP (e.g. Filecoin point-to-point [CAR], [DSync]), and enable other transports such as [WSS], [HTTP/2 Streaming], and [WebRTC]. We know of several other projects in the broader ecosystem that would like to make use of this protocol, from storage providers and CDNs to decentralized social media protocols.
 
-IPLD (and content addressing broadly) has an incredible advantage over conventional RESTful transfers: IPLD can easily deduplicate data. We strongly desire to retain this property. At Fission, our in-house file system (WNFS) is immutable-by-default. Uploading many redundant gigabytes for a small change is not practical.
+IPLD (and content addressing broadly) has an incredible advantage over conventional RESTful transfers: IPLD can easily deduplicate data. We strongly desire to retain this property. The [Web Native File System] is immutable-by-default, and often requires pushing small changes to a large, deeply-nested structure. Uploading many redundant gigabytes for a small change is not practical.
 
 ### 1.1.1 Round Trip Reduction
 
-[Bitswap] is very efficient for deduplication, but suffers when synchronizing large IPLD graphs due to the large number of round trips involved. This scales specifically with the depth of the diff in the requested graph. Discovering that a node is not available only occurs after many round trips.
+The default transfer protocol for IPFS ([Bitswap]) is very efficient for deduplication, but suffers when synchronizing large IPLD graphs due to the large number of round trips involved. This scales specifically with the depth of the diff in the requested graph. Discovering that a node is not available only occurs after many round trips.
 
-Further, since [Want List]s are stateless, we have observed uploads and downloads stall mid-transfer when a peer is considered idle (or when many new peers connect), evicting the node from the peer list. With CAR Mirror, in both streaming and at-once delivery cases, it is well understood if the session is still open.
+Further, since Bitswap Want Lists are stateless, we have observed uploads and downloads stall mid-transfer when a peer is considered idle (or when many new peers connect), evicting the node from the peer list. With CAR Mirror, in both streaming and at-once delivery cases, it is well understood if the session is still open.
 
 ### 1.1.2 HTTPS & WSS Are Mature Transports
 
-Streaming CAR files know that there is an open connection over a reliable, mature transport: HTTP, [HTTP Streaming](https://datatracker.ietf.org/doc/html/rfc7540#section-5), and persistent [WSS](https://datatracker.ietf.org/doc/html/rfc6455). Being able to efficiently push and fetch IPLD in CAR files over HTTP in particular means gaining the ability to move data over a mature, absolutely ubiquitous transport on privileged ports.
+Streaming CAR files know that there is an open connection over a reliable, mature transport: HTTP, [HTTP/2 Streaming], and persistent [WSS]. Being able to efficiently push and fetch IPLD in CAR files over HTTP in particular means gaining the ability to move data over a mature, absolutely ubiquitous transport on privileged ports.
 
 Relying on HTTP also makes TLS available everywhere, improving the security and privacy of messages. Since the proposed protocol does not depend on the public DHT (see Scope section), this provides some improvement even with public providers. The lack of dependence on the public DHT is well suited to short-lived nodes, such as browsers, GitHub Actions, and battery-sensitive devices such as mobile phones.
 
-It is worth highlighting that HTTP is unable to support many P2P use cases, and many client devices are not directly dialable as data providers. Those use cases will need continued dependence on [WebRTC](https://datatracker.ietf.org/doc/html/rfc8835) and similar. These strategies can run entirely in parallel, and are in no way mutually exclusive. A node being undialable leads to some difficulty in the design of this system, but even under these conditions, CAR protocols can be constructed that perform better than the naive case.
+It is worth highlighting that HTTP is unable to support many P2P use cases, and many client devices are not directly dialable as data providers. Those use cases will need continued dependence on [WebRTC] and similar. These strategies can run entirely in parallel, and are in no way mutually exclusive. A node being undialable leads to some difficulty in the design of this system, but even under these conditions, CAR protocols can be constructed that perform better than the naive case.
 
 ### 1.1.3 Deduplication
 
-The primary challenges are in efficient remote graph selection. Avoiding sending redundant bytes over the wire is a tradeoff which Bitswap is on one end of. There is no perfect information-theoretic solution, so designing the alternate protocol is largely an exercise in optimization.
+The primary challenges are for efficient remote graph selection in absence of knwoledge of the remote peer's data store. Avoiding sending redundant bytes over the wire is a tradeoff which Bitswap is on one end of. There is no perfect information-theoretic solution, so designing the alternate protocol is largely an exercise in optimization.
 
 Many DAG-based projects have a strong real-world use case for deduplication: the [WebNative File System] is both eventually consistent and persistent-by-default (history is retained on update, like in Apple’s Time Machine). Thanks to the large amount of structural sharing, most of this structure is unchanged when performing a synchronization.
 
@@ -385,16 +385,20 @@ Thanks to [Brendan O'Brien] for the general encouragement for this scope of work
 
 <!-- External Links -->
 
+[A Hundred Impossibility Proofs for Distributed Computing]: https://groups.csail.mit.edu/tds/papers/Lynch/podc89.pdf
 [Bitswap]: https://docs.ipfs.io/concepts/bitswap/
 [Bloom equations]: https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions
+[Bloom filter]: https://en.wikipedia.org/wiki/Bloom_filter
 [Brendan O'Brien]: https://github.com/b5
 [Brooklyn Zelenka]: https://github.com/expede 
 [CAR]: https://ipld.io/specs/transport/car/
 [CARv1]: https://ipld.io/specs/transport/car/carv1/
 [DNSLink]: https://dnslink.io
 [DSync]: https://pkg.go.dev/github.com/qri-io/dag/dsync
+[Filecoin]: https://filecoin.io/
 [Fission]: https://fission.codes
 [HTTP/2 Streaming]: https://datatracker.ietf.org/doc/html/rfc7540#section-5
+[IPFS]: https://ipfs.io
 [IPLD]: https://ipld.io/
 [IPNS]: https://docs.ipfs.io/concepts/ipns/
 [James Walker]: https://github.com/walkah
@@ -403,10 +407,8 @@ Thanks to [Brendan O'Brien] for the general encouragement for this scope of work
 [Quinn Wilton]: https://github.com/QuinnWilton
 [TAR]: https://en.wikipedia.org/wiki/Tar_(computing)
 [WSS]: https://datatracker.ietf.org/doc/html/rfc6455
+[Web Native File System]: https://github.com/wnfs-wg/spec
 [WebRTC]: https://datatracker.ietf.org/doc/html/rfc8835
 [XXH3]: https://cyan4973.github.io/xxHash/
 [libp2p]: https://libp2p.io/
 [rejection sampling]: https://en.wikipedia.org/wiki/Rejection_sampling
-[Bloom filter]: https://en.wikipedia.org/wiki/Bloom_filter
-[WebNative File System]: https://github.com/WebNativeFileSystem/
-[A Hundred Impossibility Proofs for Distributed Computing]: https://groups.csail.mit.edu/tds/papers/Lynch/podc89.pdf
