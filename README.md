@@ -103,9 +103,9 @@ Note that this does not include general DHT discovery or connection. Further wor
 ## 2.1 Roles
 
 | Role   | Dialable | On Push  | On Pull  |
-|--------|-----------|----------|----------|
-| Client | Maybe     | Sender   | Receiver |
-| Server | Yes       | Reciever | Sender   |
+|--------|----------|----------|----------|
+| Client | Maybe    | Sender   | Receiver |
+| Server | Yes      | Receiver | Sender   |
 
 Note that client/server MAY be applied in peer-to-peer contexts between capable machines. In these contexts, they merely assume these roles on a per-request basis.
 
