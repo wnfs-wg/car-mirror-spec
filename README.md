@@ -20,8 +20,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 # 0 Abstract
 
-CAR Mirror describes a method for efficiently diffing, deduplicating, packaging, and transmitting [IPLD](https://ipld.io/) data from a source node. The two primary advantages of CAR Mirror are the reduction in network round trips versus [Bitswap](https://docs.ipfs.io/concepts/bitswap/), and probabilistically excluding redundant blocks from being transferred. The protocol aims to be easy to implement for clients, whether or not they have a complete [libp2p](https://libp2p.io/) network stack.
-
+CAR Mirror describes a method for efficiently diffing, deduplicating, packaging, and transmitting [IPLD] data from a source node. The two primary advantages of CAR Mirror are the reduction in network round trips versus [Bitswap], and probabilistically excluding redundant blocks from being transferred. The protocol aims to be easy to implement for clients, whether or not they have a complete [libp2p] network stack.
+ 
 # 1 Introduction
 
 [IPLD] is structured as a Merkle DAG, which closes authentication over some rooted structure, but gives no help in determining what might be contained in it without actually walking this tree. The naive approach for deduplicated synchronization on deep DAGs requires a large number of round trips as children are discovered at each level. Not packaging up the entire structure into one request is motivated by deduplication: the recipient may already have many of the blocks, and transferring them would be redundant. This situation creates an apparent zero sum optimization problem between deduplication and round trips.
@@ -30,7 +30,7 @@ CAR Mirror describes a method for efficiently diffing, deduplicating, packaging,
 
 This proposal resolves multiple major, persistent challenges that numerous production IPFS operators have experienced. We believe the scope of this work to be an important stepping stone in the maturation of [IPFS], [Filecoin], and other [IPLD] data in production settings.
 
-We propose extending the existing efforts to move specifically CAR files over HTTP (e.g. Filecoin point-to-point CAR, Qri’s DSync), and enable other transports such as [WSS](https://datatracker.ietf.org/doc/html/rfc6455), [HTTP Streaming](https://datatracker.ietf.org/doc/html/rfc7540#section-5), and [WebRTC](https://datatracker.ietf.org/doc/html/rfc8835). We know of several other projects in the broader ecosystem that would like to make use of this protocol, from storage providers and CDNs to decentralized social media protocols.
+We propose extending the existing efforts to move specifically CAR files over HTTP (e.g. Filecoin point-to-point CAR, Qri’s DSync), and enable other transports such as [WSS], [HTTP/2 Streaming], and [WebRTC]. We know of several other projects in the broader ecosystem that would like to make use of this protocol, from storage providers and CDNs to decentralized social media protocols.
 
 IPLD (and content addressing broadly) has an incredible advantage over conventional RESTful transfers: IPLD can easily deduplicate data. We strongly desire to retain this property. At Fission, our in-house file system (WNFS) is immutable-by-default. Uploading many redundant gigabytes for a small change is not practical.
 
@@ -52,7 +52,7 @@ It is worth highlighting that HTTP is unable to support many P2P use cases, and 
 
 The primary challenges are in efficient remote graph selection. Avoiding sending redundant bytes over the wire is a tradeoff which Bitswap is on one end of. There is no perfect information-theoretic solution, so designing the alternate protocol is largely an exercise in optimization.
 
-Fission has a strong real-world use case for deduplication: the [WebNative File System](https://github.com/WebNativeFileSystem/) is both eventually consistent and persistent-by-default (history is retained on update, like in Apple’s Time Machine). Thanks to the large amount of structural sharing, most of this structure is unchanged when performing a synchronization.
+Many DAG-based projects have a strong real-world use case for deduplication: the [WebNative File System] is both eventually consistent and persistent-by-default (history is retained on update, like in Apple’s Time Machine). Thanks to the large amount of structural sharing, most of this structure is unchanged when performing a synchronization.
 
 Deduplication in this scenario is now nontrivial. When pushing or fetching data, a node needs to know what is available locally and remotely, create a diff, package that up and send it. We propose using a Bloom filter to capture a snapshot of the local state relative to some CID, and send it to the remote. We then have a picture of what is different in its copy below that root. As we can only squeeze so much information into a message, this is then done in rounds/epochs if the request is not fulfilled in the first one.
 
@@ -68,17 +68,17 @@ The motivating insights are:
 2. Rounds and deduplication are not mutually exclusive; they're not even directly correlated! To put this another way: it's possible to sacrifice some deduplication accuracy to get a large reduction in the number of rounds.
 3. In a multiple round protocol, approximate set reconciliation can be iteratively improved as more information is shared.
 
-It would be impractical (and indeed privacy violating) for the provider to maintain a list of all CIDs held by the requestor. Sending a well tuned [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) is size efficient, has a very fast membership check, and doesn't require announcing every block that it has.
+It would be impractical (and indeed privacy violating) for the provider to maintain a list of all CIDs held by the requestor. Sending a well tuned [Bloom filter] is size efficient, has a very fast membership check, and doesn't require announcing every block that it has.
 
 IPLD provides opportunities for optimizing both latency and bandwidth. The goal of CAR Mirror is to merely do better than either pure Bitswap or pure uploads. There are steps that work with imperfect knowledge, but make a bet that the data will be useful to avoid a negotiation round ahead of sending blocks. CAR Mirror aims to keep the number of rounds low, while reducing the number of duplicated blocks.
 
-The worst case scenario for CAR Mirror efficiency is exactly [DSync](https://pkg.go.dev/github.com/qri-io/dag/dsync). This is already an improvement over Bitswap, but narrowing the sync space has the potential to continually improve efficiency at the limit.
+The worst case scenario for CAR Mirror efficiency is exactly [DSync]. This is already an improvement over Bitswap, but narrowing the sync space has the potential to continually improve efficiency at the limit.
 
 ### 1.2.1 Constraints
 
 > The limitation of local knowledge is the fundamental fact about the setting in which we work, and is a very powerful limitation
 >
-> -- Nancy Lynch, [A Hundred Impossibility Proofs for Distributed Computing](https://groups.csail.mit.edu/tds/papers/Lynch/podc89.pdf)
+> -- Nancy Lynch, [A Hundred Impossibility Proofs for Distributed Computing]
 
 CAR Mirror makes few assumptions about network topology, prior history, availability, or transport. This protocol makes a cold start assumption. While CAR Mirror can do better with more state, it is stateless by default: peers assume that any information that they have about each other from previous interactions is out of date and heuristic at best. CAR Mirror is unicast and unidirectional (source-to-sink).
 
@@ -131,11 +131,11 @@ Whether a peer can initiate contact with a particular node. For example, a web b
 
 ## 2.2 CAR
 
-[Content Addressable aRchive (CAR)](https://ipld.io/specs/transport/car/) is a format similar to the [TAR file](https://en.wikipedia.org/wiki/Tar_(computing)) modified to work efficiently on IPLD data. This specification uses [CARv1](https://ipld.io/specs/transport/car/carv1/).
+[Content Addressable aRchive (CAR)][CAR] is a format similar to the [TAR] file modified to work efficiently on IPLD data. This specification uses [CARv1].
 
 ## 2.2.1 Streaming CAR
 
-A CAR file can be expressed as a streaming data structure, and transmitted over [HTTP Streaming](https://datatracker.ietf.org/doc/html/rfc7540#section-5), [WebSockets](https://datatracker.ietf.org/doc/html/rfc6455) or similar.
+A CAR file can be expressed as a streaming data structure, and transmitted over [HTTP/2 Streaming], [WebSockets][WSS] or similar.
 
 ## 2.3 Session
 
@@ -153,7 +153,7 @@ Each round of communication will have fewer stragglers. There is a degenerate ca
 
 # 3. Transport
 
-The protocol here is described in discrete rounds. When run over fully bidirectional transports such as [WSS](https://datatracker.ietf.org/doc/html/rfc6455), portions of rounds may be updated live rather than waiting for an arbitrary "round" to complete. Unidirectional transports like HTTP proceed in clear, distinct rounds. Discrete rounds are given below both because many transports require this mode, and because it is easier to explain in structured steps, even if not a hard requirement.
+The protocol here is described in discrete rounds. When run over fully bidirectional transports such as [WSS], portions of rounds may be updated live rather than waiting for an arbitrary "round" to complete. Unidirectional transports like HTTP proceed in clear, distinct rounds. Discrete rounds are given below both because many transports require this mode, and because it is easier to explain in structured steps, even if not a hard requirement.
 
 ## 3.1 Phases
 
@@ -300,11 +300,11 @@ If the size $m$ of the filter is $d$ powers of two ($2^d$), take the lowest (rig
 
 #### 3.4.1.2 Rejection Sampling
 
-A Bloom filter MAY be a length that is not a power of two. This is NOT RECOMMENDED since it incurs [rejection sampling](https://en.wikipedia.org/wiki/Rejection_sampling) overhead.
+A Bloom filter MAY be a length that is not a power of two. This is NOT RECOMMENDED since it incurs [rejection sampling] overhead.
 
-This case uses the nearest rounded power of two as in [3.4.1.1](#3411-power-of-two). If the sampled number is less than $m$, then it MUST be used as the index. If the number is larger, then right shift the unmasked number, take the required number of bits (e.g. via AND-mask) and check again. Repeat this process until the number of digits is exhausted.
+This case uses the nearest rounded power of two as described in the [Power of Two] section. If the sampled number is less than $m$, then it MUST be used as the index. If the number is larger, then right shift the unmasked number, take the required number of bits (e.g. via AND-mask) and check again. Repeat this process until the number of digits is exhausted.
 
-If none of the samples succeed, a new hash MUST be generated and this process begun again. Hash generation MUST be performed via [XXH3](https://cyan4973.github.io/xxHash/) with the rehashing generation used as a seed (a simple counter, starting at 0).
+If none of the samples succeed, a new hash MUST be generated and this process begun again. Hash generation MUST be performed via [XXH3] with the rehashing generation used as a seed (a simple counter, starting at 0).
 
 For example, if the filter has 1000 bits, take the lowest 10 bits (max 1024). If the number is less than than 1000, use that number as the index. Otherwise, right shift and try again. If the bits have been exhausted, rehash the full value and begin the process again.
 
@@ -312,7 +312,7 @@ For example, if the filter has 1000 bits, take the lowest 10 bits (max 1024). If
 
 The parameters for the Bloom are set by the Client. Many of the parameters are self-evident from the filter itself, but the number of hashes must be passed along in the initial request.
 
-Optimizing Bloom filters depends on balancing false positive probability (FPP or $\epsilon$), filter size, number of hashes, hash function, and expected number of elements. This Bloom MUST use the deterministic hash function [XXH3](https://cyan4973.github.io/xxHash/). 
+Optimizing Bloom filters depends on balancing false positive probability (FPP or $\epsilon$), filter size, number of hashes, hash function, and expected number of elements. This Bloom MUST use the deterministic hash function [XXH3]. 
 
 It is RECOMMENDED to make the FPP one order of magnitude (OOM) under the inverse of the order of magnitude of the number of inserted elements. For instance, if there are some 100ks of elements in the filter, then the FPP should be $1/1M$. This can grow quickly, so an implementation MAY use another order of magnitude, such as the inverse of the OOM of the number of inserted elements.
 
@@ -326,7 +326,7 @@ Legend
 * $\epsilon$: false positive probability
 * $k$: number of hash functions
 
-Some [optimality equations](https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions):
+Some [optimality equations][Bloom equations]:
 * $k = {m \over n} \ln{2}$
 * $m = -\frac{n \ln \epsilon}{(\ln 2)^2}$
 
@@ -355,7 +355,7 @@ Since the false positive probability is an order of magnitude lower than the num
 
 ### 3.5.3 Mutable Pointer
 
-A simple heuristic is on data updated from a mutable pointer, such as on [IPNS](https://docs.ipfs.io/concepts/ipns/) or [DNSLink](https://dnslink.io). This often shares some structure, and thus the stale graph MAY be placed into the Bloom filter.
+A simple heuristic is on data updated from a mutable pointer, such as on [IPNS] or [DNSLink]. This often shares some structure, and thus the stale graph MAY be placed into the Bloom filter.
 
 # 4. Caches
 
@@ -373,38 +373,40 @@ There exist protocols for zero-knowledge set intersection (PSI) and union (PSU).
 
 # 6. Acknowledgments
 
-A big thank you to [Justin Johnson](https://github.com/justincjohnson) for feedback on this spec, many suggestions on improving the readability, and writing the Golang implementation.
+A big thank you to [Justin Johnson] for feedback on this spec, many suggestions on improving the readability, and writing the Golang implementation.
 
-Thank you to [Quinn Wilton](https://github.com/QuinnWilton) for late night discussions on graph synchronization, error correction, Tornado codes, and alternate designs.
+Thank you to [Quinn Wilton] for late night discussions on graph synchronization, error correction, Tornado codes, and alternate designs.
 
-Thanks to [Brendan O'Brien](https://github.com/b5) for the general encouragement for this scope of work, and for the prior art on [Qri's DSync](https://pkg.go.dev/github.com/qri-io/dag/dsync).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Thanks to [Brendan O'Brien] for the general encouragement for this scope of work, and for the prior art on [DSync].
 
 <!-- Internal Links -->
 
+[Power of Two]: #3411-power-of-two
 
 <!-- External Links -->
 
-[Quinn Wilton]: https://github.com/QuinnWilton
+[Bitswap]: https://docs.ipfs.io/concepts/bitswap/
+[Bloom equations]: https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions
+[Brendan O'Brien]: https://github.com/b5
 [Brooklyn Zelenka]: https://github.com/expede 
+[CAR]: https://ipld.io/specs/transport/car/
+[CARv1]: https://ipld.io/specs/transport/car/carv1/
+[DNSLink]: https://dnslink.io
+[DSync]: https://pkg.go.dev/github.com/qri-io/dag/dsync
 [Fission]: https://fission.codes
+[HTTP/2 Streaming]: https://datatracker.ietf.org/doc/html/rfc7540#section-5
+[IPLD]: https://ipld.io/
+[IPNS]: https://docs.ipfs.io/concepts/ipns/
 [James Walker]: https://github.com/walkah
+[Justin Johnson]: https://github.com/justincjohnson
 [Philipp Krüger]: https://github.com/matheus23
+[Quinn Wilton]: https://github.com/QuinnWilton
+[TAR]: https://en.wikipedia.org/wiki/Tar_(computing)
+[WSS]: https://datatracker.ietf.org/doc/html/rfc6455
+[WebRTC]: https://datatracker.ietf.org/doc/html/rfc8835
+[XXH3]: https://cyan4973.github.io/xxHash/
+[libp2p]: https://libp2p.io/
+[rejection sampling]: https://en.wikipedia.org/wiki/Rejection_sampling
+[Bloom filter]: https://en.wikipedia.org/wiki/Bloom_filter
+[WebNative File System]: https://github.com/WebNativeFileSystem/
+[A Hundred Impossibility Proofs for Distributed Computing]: https://groups.csail.mit.edu/tds/papers/Lynch/podc89.pdf
