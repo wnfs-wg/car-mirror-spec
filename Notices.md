@@ -18,7 +18,7 @@ Licensee’s name: Brooklyn Zelenka
 
 Authorized individual and system identifier: expede
 
-Specification version: 1.0.0 or later
+Specification version: 0.1.0 or later
 
 ---------------------------------------------------------------------------------
 
