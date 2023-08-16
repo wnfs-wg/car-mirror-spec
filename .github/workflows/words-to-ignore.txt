@@ -18,6 +18,7 @@ DAGs
 DHT
 DNSLink
 DSync
+Dialable
 ERTP
 Enum
 FPP
@@ -25,8 +26,10 @@ Filecoin
 Golang
 Gozalishvili
 HTTP
+HTTPS
 Hardt
 Holmgren
+IPFS
 IPLD
 IPNS
 IPVM
@@ -51,9 +54,11 @@ PSU
 Philipp
 Pre-Draft
 Proto
+RESTful
 RPC
 SemVer
 Spritely
+TLS
 TTL
 UCAN
 UCAN's
@@ -66,6 +71,7 @@ Vagg
 Varsig
 WSS
 WebAssembly
+WebNative
 WebRTC
 WebSockets
 Worthington
@@ -86,14 +92,17 @@ dataflow
 de
 deduplicated
 deduplicates
+deduplicating
 deduplication
 delegator
 dholms
+dialable
 expede
 facto
 go-ipfs
 implicits
 interpretable
+intra-cluster
 invariants
 invoker
 iteratively
@@ -120,6 +129,7 @@ subdelegation
 subgraph
 subgraphs
 subquery
+subtractive
 subtype
 th
 tradeoff

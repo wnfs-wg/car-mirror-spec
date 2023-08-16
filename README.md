@@ -102,7 +102,7 @@ Note that this does not include general DHT discovery or connection. Further wor
 
 ## 2.1 Roles
 
-| Role   | Diallable | On Push  | On Pull  |
+| Role   | Dialable | On Push  | On Pull  |
 |--------|-----------|----------|----------|
 | Client | Maybe     | Sender   | Receiver |
 | Server | Yes       | Reciever | Sender   |
