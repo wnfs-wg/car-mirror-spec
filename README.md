@@ -64,7 +64,7 @@ Streaming data in true parallel from multiple sources is a very attractive featu
 
 The motivating insights are:
 
-1. The Requestor often has information about the structure and content of the data it's requesting (e.g. an update to a directory)
+1. The Client often has information about the structure and content of the data it's requesting (e.g. an update to a directory)
 2. Rounds and deduplication are not mutually exclusive; they're not even directly correlated! To put this another way: it's possible to sacrifice some deduplication accuracy to get a large reduction in the number of rounds.
 3. In a multiple round protocol, approximate set reconciliation can be iteratively improved as more information is shared.
 
@@ -86,7 +86,7 @@ The Bloom filter introduces new overhead not present in Bitswap. This cost is am
 
 CAR Mirror is not a discovery protocol; it assumes that the provider has (at least some) of the required data. The efficiency gains are purely in reducing the number of round trips; it is completely agnostic about the existence of a DHT.
 
-Transmitting complete information about very large block stores is not practical. Further, a Provider will typically have a much larger number of blocks than a Requestor. Narrowing the problem space down is required in the majority of cases, which can take advantage of any number of heuristics. As such, finding ways to narrow the problem space is critical.
+Transmitting complete information about very large block stores is not practical. Further, a Server will typically have a much larger number of blocks than a Client. Narrowing the problem space down is required in the majority of cases, which can take advantage of any number of heuristics. As such, finding ways to narrow the problem space is critical.
 
 ### 1.2.2 Scope
 
@@ -98,23 +98,24 @@ Our strategy is to build as much on top of existing libp2p technologies as possi
 
 Note that this does not include general DHT discovery or connection. Further work may involve peer discovery with ad hoc inclusion to the CAR Pool cluster, but would require additional protocols. Our strategy is to ship an immediately impactful protocol into Kubo, which the scope here manages the 90th percentile use case that we have seen in practice. We are happy to scope out the broader DHT provider upon request.
 
-
 # 2. Concepts
 
 ## 2.1 Roles
 
-|           | Sender            | Receiver          | Dialable |
-|-----------|-------------------|-------------------|----------|
-| Requestor | Push Upload       | Pull Download     | Maybe    |
-| Provider  | Fulfill Retrieval | Fulfill Storage   | Yes      |
+| Role   | Diallable | On Push  | On Pull  |
+|--------|-----------|----------|----------|
+| Client | Maybe     | Sender   | Receiver |
+| Server | Yes       | Reciever | Sender   |
 
-### 2.1.1 Requestor
+Note that client/server MAY be applied in peer-to-peer contexts between capable machines. In these contexts, they merely assume these roles on a per-request basis.
 
-The Requestor is the node that starts the session. This will be either the sender or receiver, depending on the direction of data flow.
+### 2.1.1 Client
 
-### 2.1.2 Provider
+The Client is the node that starts the session. This will be either the sender or receiver, depending on the direction of data flow.
 
-The Provider is the node that will fulfill the data request, either by providing storage or supplying the requested blocks.
+### 2.1.2 Server
+
+The Server is the node that will fulfill the data request, either by providing storage or supplying the requested blocks.
 
 ### 2.1.3 Sender
 
@@ -138,17 +139,17 @@ A CAR file can be expressed as a streaming data structure, and transmitted over 
 
 ## 2.3 Session
 
-A session is made up of several rounds. Each round involves the Requestor contacting the Provider. Both parties MAY maintain stateful information between rounds as part of the session. The purpose of this session information is to aid in deduplication, completion, and cleanup.
+A session is made up of several rounds. Each round involves the Client contacting the Server. Both parties MAY maintain stateful information between rounds as part of the session. The purpose of this session information is to aid in deduplication, completion, and cleanup.
 
 ### 2.3.1 Deduplication
 
-A benefit of content addressing is deduplication. CAR Mirror deduplicates blocks across both parties to avoid putting redundant data over the wire. To achieve deduplication, the Requestor shares a Bloom filter with the Provider containing an estimate of blocks that are possibly shared. This is an imprecise measure, though it does significantly better than sending duplicate blocks on the average case.
+A benefit of content addressing is deduplication. CAR Mirror deduplicates blocks across both parties to avoid putting redundant data over the wire. To achieve deduplication, the Client shares a Bloom filter with the Server containing an estimate of blocks that are possibly shared. This is an imprecise measure, though it does significantly better than sending duplicate blocks on the average case.
 
 ### 2.3.2 Stragglers
 
 Stragglers are the opposite of deduplicated blocks: they are missing. This is typically caused by false positives on the Bloom filters. As such, this protocol is biased towards stragglers.
 
-Each round of communication will have fewer stragglers. There is a degenerate case where the Provider only matches on the roots, but omits everything from the Bloom filter. This situation is roughly equivalent to Bitswap, but with the overhead of Bloom filters. In such cases, the Requestor MAY omit the Bloom filter and request specific CIDs only. This is called the "cleanup" phase. It is possible that after a few rounds, this process becomes "unstuck" and the Bloom becomes useful again.
+Each round of communication will have fewer stragglers. There is a degenerate case where the Server only matches on the roots, but omits everything from the Bloom filter. This situation is roughly equivalent to Bitswap, but with the overhead of Bloom filters. In such cases, the Client MAY omit the Bloom filter and request specific CIDs only. This is called the "cleanup" phase. It is possible that after a few rounds, this process becomes "unstuck" and the Bloom becomes useful again.
 
 # 3. Transport
 
@@ -197,7 +198,7 @@ This protocol opts for kick starting worst-case narrowing with a "cold call" rou
 
 ### 3.1.4 Graph Status
 
-Periodically -- at the end of the file or every $n$ streamed blocks -- the Receiver sends a list of unsynchronized subgraph roots: the bottom of the currently synced graph with unsynchronized children. The Provider also sends a Bloom of blocks that it thinks may be discovered as duplicates.
+Periodically -- at the end of the file or every $n$ streamed blocks -- the Receiver sends a list of unsynchronized subgraph roots: the bottom of the currently synced graph with unsynchronized children. The Server also sends a Bloom of blocks that it thinks may be discovered as duplicates.
 
 ### 3.1.5 Cleanup
 
@@ -207,82 +208,82 @@ The cleanup phase falls back to a slower but more accurate strategy. In this pha
 
 ### 3.2.1 High Level
 
-For each round, the Requestor OPTIONALLY creates a Bloom filter with all leaf and interior CIDs for the nodes suspected to be shared with the structure that it is pulling. It sends this Bloom and the top CIDs to the Provider.
+For each round, the Client OPTIONALLY creates a Bloom filter with all leaf and interior CIDs for the nodes suspected to be shared with the structure that it is pulling. It sends this Bloom and the top CIDs to the Server.
 
-In turn, the Provider initializes a fresh CAR file, which MAY be streaming. The Provider maintains a session CID memoization table (such as a hash set). It performs graph traversal on its local store, starting from the first requested CID. Absent any other information, preorder traversal is RECOMMENDED. However, an implementation MAY choose another strategy, for instance if it knows that certain blocks will be preferred first.
+In turn, the Server initializes a fresh CAR file, which MAY be streaming. The Server maintains a session CID memoization table (such as a hash set). It performs graph traversal on its local store, starting from the first requested CID. Absent any other information, preorder traversal is RECOMMENDED. However, an implementation MAY choose another strategy, for instance if it knows that certain blocks will be preferred first.
 
-Any available graph roots MUST be sent as an array (`[CID]`) by the Requestor, regardless of the Requestor's Bloom filter. These form the basis of subquery anchors in the session.
+Any available graph roots MUST be sent as an array (`[CID]`) by the Client, regardless of the Client's Bloom filter. These form the basis of subquery anchors in the session.
 
-Every CID visited is added to the Provider's internal memoization table. Each Provider block is matched against both the Requestor Bloom filter and the Provider's session cache. If a block is found in either structure, it is RECOMMENDED that the Provider exclude it from the payload, and stop walking that path. Once the relevant graph has been exhausted, the Provider closes the channel.
+Every CID visited is added to the Server's internal memoization table. Each Server block is matched against both the Client Bloom filter and the Server's session cache. If a block is found in either structure, it is RECOMMENDED that the Server exclude it from the payload, and stop walking that path. Once the relevant graph has been exhausted, the Server closes the channel.
 
-On receipt of each block, the Requestor adds the block to its local store, and to its copy of the Bloom. If the Bloom crosses a saturation point, the Requestor MUST resize it before the next round.
+On receipt of each block, the Client adds the block to its local store, and to its copy of the Bloom. If the Bloom crosses a saturation point, the Client MUST resize it before the next round.
 
-At the end of each round, the Requestor MUST inspect its graph for any missing subgraphs. If there are incomplete subgraphs, the Requestor begins again with the roots of the missing subgraphs. If the Provider fails to send a root, the Requester marks it as unavailable from that Provider. The Requestor excludes unavailable roots from future rounds in the session.
+At the end of each round, the Client MUST inspect its graph for any missing subgraphs. If there are incomplete subgraphs, the Client begins again with the roots of the missing subgraphs. If the Server fails to send a root, the Requester marks it as unavailable from that Server. The Client excludes unavailable roots from future rounds in the session.
 
-If the Provider begins returning only the requested roots but no other blocks, the Requestor MAY initiate a cleanup round. A cleanup phase merely omits the Bloom filter from the request. It is akin to a point-to-point Bitswap Want List, and performs best when there is a large number of subgraph roots with the expectation of no child nodes.
+If the Server begins returning only the requested roots but no other blocks, the Client MAY initiate a cleanup round. A cleanup phase merely omits the Bloom filter from the request. It is akin to a point-to-point Bitswap Want List, and performs best when there is a large number of subgraph roots with the expectation of no child nodes.
 
-The Requestor MAY garbage collect its session state as soon as it has all of the blocks for the structure, minus the subgraphs marked as unavailable. It is RECOMMENDED that it keep this data indexed by the `peerId` of the Provider and root CID from the request, so that it can use this information in future requests.
+The Client MAY garbage collect its session state as soon as it has all of the blocks for the structure, minus the subgraphs marked as unavailable. It is RECOMMENDED that it keep this data indexed by the `peerId` of the Server and root CID from the request, so that it can use this information in future requests.
 
-The Provider MAY garbage collect its session state when it has exhausted its graph, since false positives in the Bloom filter MAY lead to the Provider having an incorrect picture of the Requestor's store.  In addition, further requests MAY come in for that session. Session state is an optimization, so treating this as a totally new session is acceptable. However, due to this fact, it is RECOMMENDED that the Provider maintain a session state TTL of at least 30 seconds since the last block is sent. Maintaining this cache for long periods can speed up future requests, so the Provider MAY keep this information around to aid future requests.
+The Server MAY garbage collect its session state when it has exhausted its graph, since false positives in the Bloom filter MAY lead to the Server having an incorrect picture of the Client's store.  In addition, further requests MAY come in for that session. Session state is an optimization, so treating this as a totally new session is acceptable. However, due to this fact, it is RECOMMENDED that the Server maintain a session state TTL of at least 30 seconds since the last block is sent. Maintaining this cache for long periods can speed up future requests, so the Server MAY keep this information around to aid future requests.
 
 ## 3.2.2 Individual Round Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Requestor Session Store
-    actor Requestor
+    participant Client Session Store
+    actor Client
     actor Responder
     participant Responder Session Store
 
-    Note over Requestor Session Store: May have data from previous round
+    Note over Client Session Store: May have data from previous round
     Note over Responder Session Store: May have data from previous round
 
-    Requestor Session Store ->> Requestor Session Store: Walk local graph
-    Requestor Session Store ->> Requestor: Subgraph roots & updated Bloom
-    Requestor ->> Responder: (Bloom, CID roots)
+    Client Session Store ->> Client Session Store: Walk local graph
+    Client Session Store ->> Client: Subgraph roots & updated Bloom
+    Client ->> Responder: (Bloom, CID roots)
     Responder ->> Responder Session Store: Update
     Responder Session Store ->> Responder Session Store: Walk local graph
     Responder Session Store ->> Responder: Blocks
-    Responder ->> Requestor: CARv1
-    Requestor ->> Requestor Session Store: Update Sesson Bloom & CID Roots
+    Responder ->> Client: CARv1
+    Client ->> Client Session Store: Update Sesson Bloom & CID Roots
 ```
 
 ## 3.3 Push Protocol 📤
 
 ### 3.3.1 High Level
 
-The push protocol is very similar to pull (§3.2), roughly inverted. The major difference aside from direction of data flow is that the first round MAY be a "cold call". This prioritizes starting the first round with zero information about the Provider, under the assumption that the first branch of the graph will either not contain many duplicate blocks, or if it does that it is doing as well as the prior art CAR transfers. This strategy prioritizes limiting round trips over reducing bandwidth.
+The push protocol is very similar to pull (§3.2), roughly inverted. The major difference aside from direction of data flow is that the first round MAY be a "cold call". This prioritizes starting the first round with zero information about the Server, under the assumption that the first branch of the graph will either not contain many duplicate blocks, or if it does that it is doing as well as the prior art CAR transfers. This strategy prioritizes limiting round trips over reducing bandwidth.
 
-The sending Requestor begins with a local phase estimating what the Provider has in its store. This estimate is called the Provider Graph Estimate. This may be from stateful information (e.g. Bloom filters and CIDs) learned in a previous round, or by using a heuristic such as knowing that the provider has a previous copy associated with an IPNS record or DNSLink. If no information is available, the estimate is the empty set.
+The sending Client begins with a local phase estimating what the Server has in its store. This estimate is called the Server Graph Estimate. This may be from stateful information (e.g. Bloom filters and CIDs) learned in a previous round, or by using a heuristic such as knowing that the provider has a previous copy associated with an IPNS record or DNSLink. If no information is available, the estimate is the empty set.
 
-The Requestor performs graph traversal of the data under the CID to push, appending blocks to a CAR file. This CAR MAY be discrete or streaming, depending on the transport. All other factors being equal, breadth-first traversal is RECOMMENDED. Since the Provider is not expected to use the data immediately, it exposes the largest number of roots, and thus grants the highest chance of discovering shared subgraphs. An implementation MAY choose a different traversal strategy, for example if it knows more about the use.
+The Client performs graph traversal of the data under the CID to push, appending blocks to a CAR file. This CAR MAY be discrete or streaming, depending on the transport. All other factors being equal, breadth-first traversal is RECOMMENDED. Since the Server is not expected to use the data immediately, it exposes the largest number of roots, and thus grants the highest chance of discovering shared subgraphs. An implementation MAY choose a different traversal strategy, for example if it knows more about the use.
 
-On a partial cold call, the Provider Graph Estimate MUST contain the entire graph minus CIDs in the initial payload. The Provider MUST respond with a Bloom filter of all CIDs that match the Provider Graph Estimate, which is called the Provider Graph Confirmation. On subsequent rounds, the Provider Graph Estimate continues to be refined until it is empty or the entire graph has been synchronized.
+On a partial cold call, the Server Graph Estimate MUST contain the entire graph minus CIDs in the initial payload. The Server MUST respond with a Bloom filter of all CIDs that match the Server Graph Estimate, which is called the Server Graph Confirmation. On subsequent rounds, the Server Graph Estimate continues to be refined until it is empty or the entire graph has been synchronized.
 
-At the end of each round, the receiving Provider MUST respond with a Bloom filter of likely future duplicates, and an array of CID roots for pending subgraphs. Either MAY be empty, in which case it is treated merely as an `ACK`.
+At the end of each round, the receiving Server MUST respond with a Bloom filter of likely future duplicates, and an array of CID roots for pending subgraphs. Either MAY be empty, in which case it is treated merely as an `ACK`.
 
-On the next round, the Requestor checks each block against the filter, and begins appending them to the CAR and continuing on as normal.
+On the next round, the Client checks each block against the filter, and begins appending them to the CAR and continuing on as normal.
 
 ## 3.3.2 Individual Round Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Requestor Session Store
-    actor Requestor
+    participant Client Session Store
+    actor Client
     actor Responder
     participant Responder Session Store
 
-    Note over Requestor Session Store: May have data from previous round
+    Note over Client Session Store: May have data from previous round
     Note over Responder Session Store: May have data from previous round
 
-    Requestor Session Store ->> Requestor Session Store: Walk local graph
-    Requestor Session Store ->> Requestor: Remaining blocks & latest Bloom
-    Requestor ->> Responder: (Bloom, CARv1)
+    Client Session Store ->> Client Session Store: Walk local graph
+    Client Session Store ->> Client: Remaining blocks & latest Bloom
+    Client ->> Responder: (Bloom, CARv1)
     Responder ->> Responder Session Store: Add blocks and check Bloom
     Responder Session Store ->> Responder Session Store: Walk local graph
     Responder Session Store ->> Responder: Updated Bloom & subgraph Roots
-    Responder ->> Requestor: (Bloom, Subgraph Roots)
-    Requestor ->> Requestor Session Store: Update Sesson Bloom & CID Roots
+    Responder ->> Client: (Bloom, Subgraph Roots)
+    Client ->> Client Session Store: Update Sesson Bloom & CID Roots
 ```
 
 ## 3.4 Bloom Filter
@@ -309,7 +310,7 @@ For example, if the filter has 1000 bits, take the lowest 10 bits (max 1024). If
 
 ### 3.4.2 Optimization
 
-The parameters for the Bloom are set by the Requestor. Many of the parameters are self-evident from the filter itself, but the number of hashes must be passed along in the initial request.
+The parameters for the Bloom are set by the Client. Many of the parameters are self-evident from the filter itself, but the number of hashes must be passed along in the initial request.
 
 Optimizing Bloom filters depends on balancing false positive probability (FPP or $\epsilon$), filter size, number of hashes, hash function, and expected number of elements. This Bloom MUST use the deterministic hash function [XXH3](https://cyan4973.github.io/xxHash/). 
 
@@ -338,7 +339,7 @@ A typical example looks like this:
 
 ## 3.5 Similarity
 
-As the entire data store of an arbitrary Requestor may be unbounded in size, the Bloom filter is populated with blocks that are likely to match based on semantic criteria or other heuristics.
+As the entire data store of an arbitrary Client may be unbounded in size, the Bloom filter is populated with blocks that are likely to match based on semantic criteria or other heuristics.
 
 The primary challenge in determining what information to send is that this protocol deals directly with the fact that knowledge in a distributed system is local.
 
