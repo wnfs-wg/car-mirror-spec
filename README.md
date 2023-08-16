@@ -50,7 +50,7 @@ It is worth highlighting that HTTP is unable to support many P2P use cases, and 
 
 ### 1.1.3 Deduplication
 
-The primary challenges are for efficient remote graph selection in absence of knwoledge of the remote peer's data store. Avoiding sending redundant bytes over the wire is a tradeoff which Bitswap is on one end of. There is no perfect information-theoretic solution, so designing the alternate protocol is largely an exercise in optimization.
+The primary challenges are for efficient remote graph selection in absence of knowledge of the remote peer's data store. Avoiding sending redundant bytes over the wire is a tradeoff which Bitswap is on one end of. There is no perfect information-theoretic solution, so designing the alternate protocol is largely an exercise in optimization.
 
 Many DAG-based projects have a strong real-world use case for deduplication: the [WebNative File System] is both eventually consistent and persistent-by-default (history is retained on update, like in Apple’s Time Machine). Thanks to the large amount of structural sharing, most of this structure is unchanged when performing a synchronization.
 
@@ -68,7 +68,7 @@ The motivating insights are:
 2. Rounds and deduplication are not mutually exclusive; they're not even directly correlated! To put this another way: it's possible to sacrifice some deduplication accuracy to get a large reduction in the number of rounds.
 3. In a multiple round protocol, approximate set reconciliation can be iteratively improved as more information is shared.
 
-It would be impractical (and indeed privacy violating) for the provider to maintain a list of all CIDs held by the requestor. Sending a well tuned [Bloom filter] is size efficient, has a very fast membership check, and doesn't require announcing every block that it has.
+It would be impractical (and indeed privacy violating) for the provider to maintain a list of all CIDs held by the client. Sending a well tuned [Bloom filter] is size efficient, has a very fast membership check, and doesn't require announcing every block that it has.
 
 IPLD provides opportunities for optimizing both latency and bandwidth. The goal of CAR Mirror is to merely do better than either pure Bitswap or pure uploads. There are steps that work with imperfect knowledge, but make a bet that the data will be useful to avoid a negotiation round ahead of sending blocks. CAR Mirror aims to keep the number of rounds low, while reducing the number of duplicated blocks.
 
