@@ -402,7 +402,7 @@ Thanks to [Brendan O'Brien] for the general encouragement for this scope of work
 [IPLD]: https://ipld.io/
 [IPNS]: https://docs.ipfs.io/concepts/ipns/
 [James Walker]: https://github.com/walkah
-[Justin Johnson]: https://github.com/justincjohnson
+[Justin Johnson]: https://github.com/justindotpub
 [Philipp Krüger]: https://github.com/matheus23
 [Quinn Wilton]: https://github.com/QuinnWilton
 [TAR]: https://en.wikipedia.org/wiki/Tar_(computing)
