@@ -109,6 +109,17 @@ Note that this does not include general DHT discovery or connection. Further wor
 
 Note that client/server MAY be applied in peer-to-peer contexts between capable machines. In these contexts, they merely assume these roles on a per-request basis.
 
+``` mermaid
+sequenceDiagram
+    Note over Client, Server: Pull
+    Client -->>+ Server: 🙏
+    Server ->>- Client: 📦📦📦
+
+    Note over Client, Server: Push
+    Client ->>+ Server: 📦📦📦
+    Server -->>- Client: 👍
+```
+
 ### 2.1.1 Client
 
 The Client is the node that starts the session. This will be either the sender or receiver, depending on the direction of data flow.
