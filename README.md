@@ -376,7 +376,7 @@ A simple heuristic is on data updated from a mutable pointer, such as on [IPNS] 
 
 # 4. Caches
 
-It is RECOMMENDED that CAR Mirror-enabled nodes maintain local caches of peer states, metadata about their own block stores, and memoization tables. Using unique peer IDs from libp2p, TLS session, or a session-limted nonce is RECOMMENDED.
+It is RECOMMENDED that CAR Mirror-enabled nodes maintain local caches of peer states, metadata about their own block stores, and memoization tables. Using unique peer IDs from libp2p, TLS session, or a session-limited nonce is RECOMMENDED.
 
 # 5. FAQ
 
