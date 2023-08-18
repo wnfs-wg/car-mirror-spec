@@ -154,7 +154,7 @@ A session is made up of several rounds. Each round involves the Client contactin
 
 ### 2.3.1 Deduplication
 
-A benefit of content addressing is deduplication. CAR Mirror deduplicates blocks across both parties to avoid putting redundant data over the wire. To achieve deduplication, the Client shares a Bloom filter with the Server containing an estimate of blocks that are possibly shared. This is an imprecise measure, though it does significantly better than sending duplicate blocks on the average case.
+A benefit of content addressing is deduplication. CAR Mirror deduplicates blocks across both parties to avoid putting redundant data over the wire. To achieve deduplication, the Client shares a Bloom filter with the Server containing an estimate of (interior and terminal) DAG blocks that are possibly shared. This is an imprecise measure, though it does significantly better than sending duplicate blocks on the average case.
 
 ### 2.3.2 Stragglers
 
@@ -209,7 +209,7 @@ This protocol opts for kick starting worst-case narrowing with a "cold call" rou
 
 ### 3.1.4 Graph Status
 
-Periodically -- at the end of the file or every $n$ streamed blocks -- the Receiver sends a list of unsynchronized subgraph roots: the bottom of the currently synced graph with unsynchronized children. The Server also sends a Bloom of blocks that it thinks may be discovered as duplicates.
+Periodically -- at the end of the file or every $n$ streamed blocks -- the Receiver sends a list of unsynchronized subgraph roots: the bottom of the currently synced graph with unsynchronized children. The Server also sends a Bloom of (interior and terminal) DAG blocks that it thinks may be discovered as duplicates.
 
 ### 3.1.5 Cleanup
 
@@ -239,7 +239,7 @@ sequenceDiagram
 
 ### 3.2.1 Client Request
 
-For each round, the Client creates a Bloom filter with all leaf and interior [CID]s for the nodes suspected to be shared with the structure that it is pulling. This filter MAY be empty. The Client sends this Bloom and the relevant graph root(s) to the Server.
+For each round, the Client creates a Bloom filter with all terminal and interior [CID]s for the nodes suspected to be shared with the structure that it is pulling. This filter MAY be empty. The Client sends this Bloom and the relevant graph root(s) to the Server.
 
 ### 3.2.2 Server Processing
 
