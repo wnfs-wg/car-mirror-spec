@@ -221,19 +221,19 @@ The cleanup phase falls back to a slower but more accurate strategy. In this pha
 sequenceDiagram
     participant Client Session Store
     actor Client
-    actor Responder
-    participant Responder Session Store
+    actor Server
+    participant Server Session Store
 
     Note over Client Session Store: May have data from previous round
-    Note over Responder Session Store: May have data from previous round
+    Note over Server Session Store: May have data from previous round
 
     Client Session Store ->> Client Session Store: Walk local graph
     Client Session Store ->> Client: Subgraph roots & updated Bloom
-    Client ->> Responder: (Bloom, CID roots)
-    Responder ->> Responder Session Store: Update
-    Responder Session Store ->> Responder Session Store: Walk local graph
-    Responder Session Store ->> Responder: Blocks
-    Responder ->> Client: CARv1
+    Client ->> Server: (Bloom, CID roots)
+    Server ->> Server Session Store: Update
+    Server Session Store ->> Server Session Store: Walk local graph
+    Server Session Store ->> Server: Add blocks
+    Server ->> Client: CARv1
     Client ->> Client Session Store: Update Sesson Bloom & CID Roots
 ```
 
@@ -245,15 +245,17 @@ For each round, the Client creates a Bloom filter with all terminal and interior
 
 The Server initializes a fresh CAR file, which MAY be static or streaming. The Server SHOULD maintain a session CID cache (such as a hash set). The Server performs graph traversal on its local store, starting from the first requested CID and following the IPLD links. Absent any other information, preorder traversal is RECOMMENDED. However, an implementation MAY choose another strategy, for instance if it knows that certain blocks will be preferred first.
 
-Any available graph roots MUST be sent as an array (`[CID]`) by the Client, regardless of the Client's Bloom filter. These roots form the basis of subquery anchors in the session.
+Any missing graph roots MUST be sent as an array (`[CID]`) by the Client, regardless of the Client's Bloom filter. These roots form the basis of subquery anchors in the session.
 
-Every CID visited is added to the Server's session cache. Each visited block is matched against both the Client Bloom filter and the Server's session cache. If a block is found in either structure, it is RECOMMENDED that the Server exclude it from the payload, and stop walking that path. Once the relevant graph has been exhausted, the Server closes the channel.
+Each visited CID is matched against the Client Bloom filter. If a CID matches it, it is RECOMMENDED that the Server excludes the corresponding block from the payload, except if the CID was explicitly requested as a missing graph root.
 
 ### 3.2.3 Client Receives Payload
 
-On receipt of each block, the Client adds the block to its local store, and to its copy of the Bloom. If the Bloom crosses a saturation point, the Client MUST resize it before the next round.
+On receipt of each block, the Client adds the block to its local store.
 
-At the end of each round, the Client MUST inspect its graph for any missing subgraphs. If there are incomplete subgraphs, the Client begins again with the roots of the missing subgraphs. If the Server fails to send a root, the Requester marks it as unavailable from that Server. The Client excludes unavailable roots from future rounds in the session.
+At the end of each round, the Client MUST inspect its graph. Any blocks it has are added into an appropriately sized Bloom filter.
+
+For any missing subgraphs, the Client begins a new round with them as the roots. If the Server fails to send a root, the Requester marks it as unavailable from that Server. The Client excludes unavailable roots from future rounds in the session.
 
 ### 3.2.4 Cleanup
 
@@ -269,19 +271,19 @@ The Server MAY garbage collect its session state when it has exhausted its graph
 sequenceDiagram
     participant Client Session Store
     actor Client
-    actor Responder
-    participant Responder Session Store
+    actor Server
+    participant Server Session Store
 
     Note over Client Session Store: May have data from previous round
-    Note over Responder Session Store: May have data from previous round
+    Note over Server Session Store: May have data from previous round
 
     Client Session Store ->> Client Session Store: Walk local graph
-    Client Session Store ->> Client: Remaining blocks & latest Bloom
-    Client ->> Responder: (Bloom, CARv1)
-    Responder ->> Responder Session Store: Add blocks and check Bloom
-    Responder Session Store ->> Responder Session Store: Walk local graph
-    Responder Session Store ->> Responder: Updated Bloom & subgraph Roots
-    Responder ->> Client: (Bloom, Subgraph Roots)
+    Client Session Store ->> Client: Remaining blocks
+    Client ->> Server: CARv1
+    Server ->> Server Session Store: Add blocks
+    Server Session Store ->> Server Session Store: Walk local graph
+    Server Session Store ->> Server: Updated Bloom & subgraph Roots
+    Server ->> Client: (Bloom, Subgraph Roots)
     Client ->> Client Session Store: Update Sesson Bloom & CID Roots
 ```
 
@@ -293,11 +295,11 @@ The sending Client begins with a local phase estimating what the Server has in i
 
 The Client performs graph traversal of the data under the CID to push, appending blocks to a CAR file. This CAR MAY be discrete or streaming, depending on the transport. All other factors being equal, breadth-first traversal is RECOMMENDED. Since the Server is not expected to use the data immediately, it exposes the largest number of roots, and thus grants the highest chance of discovering shared subgraphs. An implementation MAY choose a different traversal strategy, for example if it knows more about the use.
 
-On a partial cold call, the Server Graph Estimate MUST contain the entire graph minus CIDs in the initial payload. The Server MUST respond with a Bloom filter of all CIDs that match the Server Graph Estimate, which is called the Server Graph Confirmation. On subsequent rounds, the Server Graph Estimate continues to be refined until it is empty or the entire graph has been synchronized.
-
 ### 3.3.2 Server `ACK`
 
-At the end of each round, the receiving Server MUST respond with a Bloom filter of likely future duplicates, and an array of CID roots for pending subgraphs. Either MAY be empty, in which case it is treated merely as an `ACK`.
+At the end of each round, the receiving Server MUST respond with a Bloom filter of CIDs of blocks it has in the subgraph or blocks that are likely future duplicates, and an array of CID roots for pending subgraphs. The Bloom filter MAY be empty, in which case it is treated merely as an `ACK`.
+
+If the server responds with an empty list of pending subgraphs, the protocol is finished.
 
 ### 3.3.3 Next Round
 
@@ -307,9 +309,9 @@ On the next round, the Client checks each block against the filter, and begins a
 
 ### 3.4.1 Indexing
 
-Indexes MUST be generated from hashes using the following strategy, based on whether or not the filter fits perfectly into a power of two ($2^c$). This is a single algorithm, but if the size of the Bloom filter is a power of two, rejection sampling MAY be omitted. Using a Bloom filter that is a power of two is RECOMMENDED since it avoids resampling.
+Indexes MUST be generated from hashes using the following strategy, based on whether or not the filter fits perfectly into a power of two ($2^c$). This is a single algorithm, but if the size of the Bloom filter is a power of two, rejection sampling isn't needed. Because of that, using a Bloom filter that is a power of two is RECOMMENDED.
 
-NB: The Bloom filter's bucket order (index) MUST be interpreted big-endian and zero-indexed. All hashes generated for indexing MUST be interpreted as big-endian natural numbers.
+NB: The Bloom filter's bucket order (index) MUST be interpreted zero-indexed.
 
 #### 3.4.1.1 Power of Two
 
@@ -319,11 +321,9 @@ If the size $m$ of the filter is $d$ powers of two ($2^d$), take the lowest (rig
 
 A Bloom filter MAY be a length that is not a power of two. This is NOT RECOMMENDED since it incurs [rejection sampling] overhead.
 
-This case uses the nearest rounded power of two as described in the [Power of Two] section. If the sampled number is less than $m$, then it MUST be used as the index. If the number is larger, then right shift the unmasked number, take the required number of bits (e.g. via AND-mask) and check again. Repeat this process until the number of digits is exhausted.
+This case uses the nearest rounded power of two as described in the [Power of Two] section. If the sampled number is less than $m$, then it MUST be used as the index. If the number is larger, then a new hash MUST be generated and this process begun again. Hash generation MUST be performed via [XXH3] with the rehashing generation used as a seed (a simple counter, starting at 0).
 
-If none of the samples succeed, a new hash MUST be generated and this process begun again. Hash generation MUST be performed via [XXH3] with the rehashing generation used as a seed (a simple counter, starting at 0).
-
-For example, if the filter has 1000 bits, take the lowest 10 bits (max 1024). If the number is less than than 1000, use that number as the index. Otherwise, right shift and try again. If the bits have been exhausted, rehash the full value and begin the process again.
+For example, if the filter has 1000 bits, take the lowest 10 bits (max 1024). If the number is less than than 1000, use that number as the index. Otherwise rehash the full value with seed 1 and begin the process again, etc.
 
 ### 3.4.2 Optimization
 
